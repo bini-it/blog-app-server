@@ -18,7 +18,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/blogs", blogRoutes);
 
-connect(process.env.MONGO_URI_LOCAL)
+connect(process.env.MONGO_URI)
   .then(() => {
     console.log("MongoDB connected");
     app.listen(process.env.PORT, () =>
