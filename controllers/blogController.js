@@ -6,15 +6,25 @@ import Blog from "../models/Blog.js";
 // =============================
 export const createBlog = async (req, res) => {
   try {
-    const { title, content } = req.body;
-    if (!title || !content) {
+    const { title, content, category } = req.body;
+    if (!title || !content || !category) {
       return res
         .status(400)
-        .json({ message: "Title and content are required" });
+        .json({ message: "Title ,content and category are required" });
     }
+    const allowedCategories = ["tech", "lifestyle", "education"];
+    const normalizedCategory = category.toLowerCase();
+
+    if (!allowedCategories.includes(normalizedCategory)) {
+      return res.status(400).json({
+        message: "Allowed categories are Tech, Lifestyle, or Education",
+      });
+    }
+
     const blog = await Blog.create({
       title,
       content,
+      category: normalizedCategory,
       author: req.user.id,
     });
 
@@ -31,39 +41,80 @@ export const createBlog = async (req, res) => {
 // =============================
 // GET ALL BLOGS (public)
 // =============================
+// export const getAllBlogs = async (req, res) => {
+//   try {
+//     const page = Math.max(parseInt(req.query.page) || 1, 1);
+//     const limit = Math.min(parseInt(req.query.limit) || 10, 50);
+//     const skip = (page - 1) * limit;
+
+//     const [total, blogs] = await Promise.all([
+//       Blog.countDocuments(),
+//       Blog.find()
+//         .populate("author", "email firstName lastName")
+//         .sort({ createdAt: -1 })
+//         .skip(skip)
+//         .limit(limit)
+//         .lean(),
+//     ]);
+
+//     const totalPages = Math.ceil(total / limit);
+
+//     res.status(200).json({
+//       blogs,
+//       page,
+//       limit,
+//       total,
+//       totalPages,
+//       hasNextPage: page < totalPages,
+//       hasPrevPage: page > 1,
+//     });
+//   } catch (error) {
+//     console.error("Get Blogs Error:", error);
+//     res.status(500).json({ message: "Server error" });
+//   }
+// };
+
 export const getAllBlogs = async (req, res) => {
   try {
-    const page = Math.max(parseInt(req.query.page) || 1, 1);
-    const limit = Math.min(parseInt(req.query.limit) || 10, 50);
-    const skip = (page - 1) * limit;
+    const { page, limit, category } = req.query;
 
+    // 1. Initialize query object
+    const filter = {};
+    if (category) {
+      filter.category = category;
+    }
+
+    const currentPage = Math.max(parseInt(page) || 1, 1);
+    const currentLimit = Math.min(parseInt(limit) || 10, 50);
+    const skip = (currentPage - 1) * currentLimit;
+
+    // 2. Apply filter to both count and find
     const [total, blogs] = await Promise.all([
-      Blog.countDocuments(),
-      Blog.find()
+      Blog.countDocuments(filter), // Counts only filtered items
+      Blog.find(filter) // Finds only filtered items
         .populate("author", "email firstName lastName")
         .sort({ createdAt: -1 })
         .skip(skip)
-        .limit(limit)
+        .limit(currentLimit)
         .lean(),
     ]);
 
-    const totalPages = Math.ceil(total / limit);
+    const totalPages = Math.ceil(total / currentLimit);
 
     res.status(200).json({
       blogs,
-      page,
-      limit,
+      page: currentPage,
+      limit: currentLimit,
       total,
       totalPages,
-      hasNextPage: page < totalPages,
-      hasPrevPage: page > 1,
+      hasNextPage: currentPage < totalPages,
+      hasPrevPage: currentPage > 1,
     });
   } catch (error) {
     console.error("Get Blogs Error:", error);
     res.status(500).json({ message: "Server error" });
   }
 };
-
 // =============================
 // GET SINGLE BLOG (public)
 // =============================
@@ -126,7 +177,7 @@ export const likeBlog = async (req, res) => {
     await Blog.findByIdAndUpdate(req.params.id, {
       $addToSet: { likes: req.user.id },
     });
-    res.status(200).json({ message: "Blog liked", likes: blog.likes.length });
+    res.status(200).json({ message: "Blog liked", likes: blog.likes.length + 1 });
   } catch (error) {
     console.error("Like Blog Error:", error);
     res.status(500).json({ message: "Server error" });
@@ -155,7 +206,7 @@ export const unlikeBlog = async (req, res) => {
       $pull: { likes: req.user.id },
     });
 
-    res.status(200).json({ message: "Blog unliked", likes: blog.likes.length });
+    res.status(200).json({ message: "Blog unliked", likes: blog.likes.length - 1 });
   } catch (error) {
     console.error("Unlike Blog Error:", error);
     res.status(500).json({ message: "Server error" });
