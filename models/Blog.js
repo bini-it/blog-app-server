@@ -4,7 +4,11 @@ const blogSchema = new Schema(
   {
     title: { type: String, required: true, unique: true },
     content: { type: String, required: true },
-
+    category: {
+      type: String,
+      enum: ["tech", "lifestyle", "education"],
+      required: true,
+    },
     author: {
       type: Schema.Types.ObjectId,
       ref: "User",
